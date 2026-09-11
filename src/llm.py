@@ -70,7 +70,14 @@ def chat(messages, model=None, temperature=0.0, max_tokens=512, use_cache=True):
             last_err = e
             time.sleep(2 ** attempt)
     else:
-        raise RuntimeError(f"LLM call failed after 3 attempts: {last_err}")
+        hint = ""
+        if "localhost" in BASE_URL or "127.0.0.1" in BASE_URL:
+            hint = ("\n  The endpoint is local, so this usually means Ollama is not running."
+                    "\n  Start it with:  ollama serve"
+                    f"\n  Then check:     curl {BASE_URL}/models")
+        raise RuntimeError(
+            f"LLM call to {BASE_URL} (model={model}) failed after 3 attempts: "
+            f"{last_err}{hint}")
 
     if use_cache:
         _db().execute("INSERT OR REPLACE INTO cache VALUES (?,?)", (key, text))

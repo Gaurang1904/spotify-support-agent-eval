@@ -99,10 +99,10 @@ and asks for a verdict on the same 3-point scale the judge uses.
 
 ### Problem framing: what "good" means for SpotifyCares
 
-Spotify's Twitter support is a **triage desk, not a resolution desk**. Roughly a
-third of its replies are "DM us your account email"; the agent has no account
-access, no billing system, no ability to issue a refund. So the job is not
-"resolve the ticket". The job is:
+Spotify's Twitter support is a **triage desk, not a resolution desk**. A third
+of its replies are "DM us your account email"; the agent has no account access,
+no billing system, no ability to issue a refund. The job is not to resolve the
+ticket. It is to:
 
 - put the message in the right lane,
 - answer the ones that are genuinely answerable in public — catalogue
@@ -111,51 +111,40 @@ access, no billing system, no ability to issue a refund. So the job is not
 - and hand the rest to a human *cleanly and early*, with a reason a support
   lead can audit.
 
-That makes the cost function asymmetric. Over-escalating wastes an agent's
-minute. Under-escalating means a bot confidently tells someone their refund is
-processed. **Missed escalations are the metric that matters**, and I report
-them as a raw count, not folded into an F1.
+The cost function is asymmetric: over-escalating wastes a minute of an agent's
+time, under-escalating means a bot tells someone their refund is processed.
+**Missed escalations are reported as a raw count**, not folded into an F1.
 
 #### What I deliberately did not build
 
-- **No multi-turn dialogue.** The agent sees the opening message only. Every
-  case in this dataset starts with one public tweet; conversation state moves
-  into DMs the dataset does not contain.
-- **No fine-tuning.** With 150 labels, a fine-tune measures the golden set, not
-  the task.
-- **No embeddings / vector DB.** TF-IDF over 28k short tweets is competitive
-  here, keeps product names and misspellings a small embedding model
-  smooths away, and is one dependency lighter.
-- **No sentiment or priority model.** Anger matters only insofar as it changes
-  routing, and the escalation policy already covers it.
-- **No PII scrubbing pipeline.** The dataset is already redacted to
-  `__email__`; the agent detects the residue and escalates rather than rewriting
-  it.
-- **No production serving.** No API, no queue, no retry semantics — scaffolding
-  around an unproven core.
+- **No multi-turn dialogue.** The agent sees the opening tweet only;
+  conversation state moves into DMs the dataset does not contain.
+- **No fine-tuning.** With 150 labels a fine-tune measures the golden set.
+- **No embeddings / vector DB.** TF-IDF over 28k short tweets is competitive,
+  keeps product names and misspellings, and is one dependency lighter.
+- **No sentiment or priority model.** Anger matters only where it changes
+  routing, which the escalation policy already covers.
+- **No PII scrubbing.** The dataset is pre-redacted; the agent escalates on the
+  residue rather than rewriting it.
+- **No production serving.** Scaffolding around an unproven core.
 
 ### The taxonomy
 
-TF-IDF + KMeans (k=14) over 28,197 opening messages, then merged by hand on the
-test *"would a support agent do the same thing for these?"*:
-
-`playback_error` · `account_access` · `billing_subscription` · `family_plan` ·
-`content_request` · `feature_feedback` · `praise_chatter` · `other`
-
-The escalation policy is anchored to the brand's own behaviour: every intent
-marked always-escalate is one Spotify itself answered with "DM us your account
-email" — a human working backstage (decision 10).
+TF-IDF + KMeans (k=14) over 28,197 opening messages, merged by hand on the
+test *"would a support agent do the same thing for these?"*: `playback_error` ·
+`account_access` · `billing_subscription` · `family_plan` · `content_request` ·
+`feature_feedback` · `praise_chatter` · `other`. The escalation policy is
+anchored to the brand's own behaviour — every always-escalate intent is one
+Spotify itself answered with "DM us your account email" (decision 10).
 
 ### The golden set
 
-150 examples, hand-labelled blind with intent **and** route, in two disjoint slices:
-
-- **stratified (100)** — proportional across the 14 clusters with a floor of 8,
-  so `family_plan` and `web player` are actually present;
-- **random (50)** — a uniform draw, untouched by stratification.
-
-Golden thread ids are excluded from the retrieval index so the agent cannot
-retrieve the case it is being scored on.
+150 examples, hand-labelled blind with intent **and** route, in two disjoint
+slices: **stratified (100)**, proportional across the 14 clusters with a floor
+of 8 so rare intents appear at all, and **random (50)**, a uniform draw. Golden
+thread ids are excluded from the retrieval index so the agent cannot retrieve
+the case it is scored on. 2.0% were marked ambiguous and dropped; median
+labelling time 12s over 44 minutes.
 
 ### Baselines
 
@@ -194,24 +183,18 @@ are **statistically indistinguishable** on every intent and routing metric. The
 one thing the agent demonstrably buys is automation rate — 57.8% against 30.6%
 — and that is a threshold choice, not model quality.
 
-**This is a null, not a proof of equivalence, and the distinction matters.**
-The accuracy interval is [−0.068, +0.150]: half-width ~0.11, so this test can
-only resolve differences larger than about 11 accuracy points. A real 5-point
-advantage for the agent would be invisible at this sample size. The honest
-claim is *"no difference detectable at n = 147"*, not *"no difference exists"*.
-Detecting a 5-point effect at this variance would need roughly 800-1000
-labelled examples — five to seven times the golden set, which is the main
-argument for spending the next week labelling rather than modelling.
+**This is a null, not proof of equivalence.** Half-width ~0.11, so the test
+resolves nothing under ~11 accuracy points; a real 5-point advantage would be
+invisible. Detecting one would need roughly 800-1000 labels — the main argument
+for spending next week labelling rather than modelling.
 
-Both beat the trivial baseline decisively, which mostly proves the task is
-non-trivial rather than that either system is good.
+Both beat the trivial baseline decisively, which proves the task is non-trivial
+rather than that either system is good.
 
-**Reproducibility.** Every number above comes from the run that the shipped
+**Reproducibility.** Every number comes from the run the shipped
 `outputs/llm_cache.db` reproduces exactly. Ollama is not deterministic even at
-`temperature=0`, so a reviewer who deletes the cache and regenerates should
-expect roughly one example in 147 to flip: observed spread across runs was
-accuracy 0.585-0.592, macro F1 0.496-0.500, reply score 4.52-4.56. That is far
-inside every confidence interval here, but it is not zero and it is not hidden.
+`temperature=0`; deleting the cache moves about one example in 147 (observed:
+accuracy 0.585-0.592, reply 4.52-4.56) — inside every CI here, but not zero.
 
 ### Judge validity
 
@@ -248,28 +231,44 @@ Caveat: n = 60, split 18/17/25 across systems, so the per-system means are
 within noise. The kappa is the load-bearing number; the ranking inversion is
 strong but not conclusive.
 
-**Why this generalises beyond one project.** LLM-as-judge is the default way
-teams evaluate support-reply quality, and it is usually deployed without a
-human-agreement check or a human-ceiling control. This project ran both, on
-real production support data, and the method failed both: chance-level
-agreement, inverted ranking, and human agents scored below a 3B model. Neither
-control is expensive — 60 blind ratings and one extra scoring pass. Any team
-grading generated replies with an LLM judge and no human control should assume
-their numbers are measuring the rubric until they have checked.
+**This generalises.** LLM-as-judge is the default way teams grade support
+replies, usually with no human-agreement check and no human-ceiling control.
+Both controls here are cheap — 60 blind ratings and one extra scoring pass —
+and the method failed both. Absent them, assume such numbers measure the
+rubric.
 
 ### Failure analysis
 
-**1. `other` is undetectable — 24 gold examples, 1 correct.**
-The model has no concept of "this tweet contains no classifiable request." The
-24 `other` rows scatter into `account_access` (8), `praise_chatter` (6),
-`feature_feedback` (3), `content_request` (3), `billing_subscription` (3).
+**1. The model ignores its own retrieval. Found by demoing, not by the harness.**
+This is the core required feature — a reply "grounded in how that brand has
+historically resolved similar issues" — and it silently does not work.
+Retrieval is fine; the correct past cases come back with good similarity. The
+model treats them as *tone* samples and discards their *content*.
 
-> "Answer my DM! Urgent, thanks." → predicted `praise_chatter`, confidence 1.0
+> **customer:** "why isn't the new Taylor Swift album on spotify in the UK?"
+> **retrieved [0.719]:** "We'd love to have all of Taylor's stuff available, but
+> we have some info about content here..."
+> **retrieved [0.626]:** "Fingers crossed we'll be able to have it soon..."
+> **agent:** *"The new Taylor Swift album **is available** on Spotify in the UK."*
 
-*Hypothesis:* the prompt offers 8 positive categories and one residual, and an
-instruction-tuned model asked to choose a label will always find a positive one
-it likes. A `null`-first prompt, or a confidence gate before classification,
-would likely fix this. It is 16% of the golden set.
+Every exemplar says the brand does not have it. The agent asserted the
+opposite as fact. A customer acting on that reply goes looking for something
+that is not there.
+
+> **customer:** "how do I access your live chat? Used it last month and it was
+> amazing"
+> **retrieved [0.829]:** "you can also reach out to our Chat team here [link]"
+> **agent:** `praise_chatter`, confidence 1.0 — *"We're glad to hear you had a
+> great experience!"* No link, no answer.
+
+The top hit contained exactly the answer. The model replied to the sentiment
+instead.
+
+*Hypothesis:* one JSON call collapses classification, routing and drafting into
+a single generation, so retrieved text enters as style rather than evidence.
+This is the mechanism behind the judge's `grounded` sub-score of 1.13/2, a
+number that sat here unexplained until a demo produced one. 147 evaluated
+examples missed it; two minutes of demoing did not.
 
 **2. Confidence is anti-calibrated, so the confidence guardrail is dead code.**
 The agent reports a confidence and the router escalates anything below 0.5.
@@ -287,27 +286,37 @@ caught by a different rule. Worse, the signal is **inverted at the top**: the
 model is least accurate exactly when it claims certainty. 61 of 147 predictions
 are wrong at confidence >= 0.8.
 
-*Hypothesis:* a 3B instruction-tuned model asked to emit a confidence emits a
-plausible-looking number, not a calibrated one — it has learned that support
-replies sound confident. Any design that gates on self-reported confidence is
-resting on nothing. The fix is an external signal: retrieval similarity,
-classifier margin, or agreement between two prompts.
+*Hypothesis:* a 3B model asked for a confidence emits a plausible number, not
+a calibrated one. Gating on self-reported confidence rests on nothing; the fix
+is an external signal — retrieval similarity, classifier margin, or two-prompt
+agreement.
 
-**3. Broken-app complaints read as product opinion — 10 cases,
+**3. `other` is undetectable — 24 gold examples, 1 correct.**
+The model has no concept of "this tweet contains no classifiable request." The
+24 `other` rows scatter into `account_access` (8), `praise_chatter` (6),
+`feature_feedback` (3), `content_request` (3), `billing_subscription` (3).
+
+> "Answer my DM! Urgent, thanks." -> predicted `praise_chatter`, confidence 1.0
+
+*Hypothesis:* offered 8 positive categories and one residual, the model always
+finds a positive one it likes. A two-stage "is there a request at all?" check
+would likely fix it. 16% of the golden set.
+
+**4. Broken-app complaints read as product opinion — 10 cases,
 `playback_error` -> `feature_feedback`.** The single largest confusion.
 
 > "Please fix the desktop app? Endless spinning, everything, all platforms —
 > weeks now. PLEASE FIX" -> `feature_feedback` / auto-handle, confidence 0.8
 
-*Hypothesis:* imperative "please fix / please add" phrasing dominates the
-model's decision over the symptom described. The retrieved exemplars do not
-help, because past agents replied to both with the same soothing template.
+*Hypothesis:* imperative "please fix / please add" phrasing outweighs the
+symptom described, and the exemplars do not help because past agents answered
+both with the same soothing template.
 
-**4. Over-escalation is the dominant routing error — 29 cases, 20% of the set —
-and it asks for personal data in public.** Escalation precision is 0.532:
-nearly half of everything sent to a human did not need to be. The deterministic
-guardrail causes it — any misclassification into an account-bound intent forces
-escalation, so a classification error becomes a routing error.
+**5. Over-escalation — 29 cases, 20% of the set — and it asks for personal
+data in public.** Escalation precision 0.532: nearly half of what reaches a
+human did not need to. The guardrail causes it — any misclassification into an
+account-bound intent forces escalation, turning a classification error into a
+routing error.
 
 > Spotify's own advertisement, appearing in the inbound stream -> predicted
 > `billing_subscription` -> escalate -> *"Sorry, we can't confirm the 99p offer.
@@ -318,11 +327,45 @@ failure with real-world cost, and the PII guardrail does not catch it: the
 regex checks the **customer's** message for personal data and never the
 **agent's own reply**.
 
-**5. Three empty replies, and the judge hallucinated violations in all of
-them.** The agent returned an empty string three times. The judge scored one
-4/8 with the comment *"requests personal data in public and falsely promises
-action"* — describing a reply that does not exist. This is the judge-validity failure caught in a single example, and it is why the kappa matters more
-than any score the judge produced.
+#### Grounding ablation: I tried the obvious fix and it did not work
+
+The obvious fix is to tell the model the retrieved cases are facts.
+`agent.py` carries it as `GROUNDING_PATCH`, **off by default so the evaluated
+system stays frozen**; `grounding_ablation.py` runs both variants over 26 cases
+where retrieval fired, including both demo cases.
+
+The metric is deliberately **not** the LLM judge — at kappa 0.100 nothing it
+emits can carry an argument. Each reply was hand-rated blind to variant, on a
+question of fact: **C** contradicts the retrieved cases · **I** ignores an
+answer that was right there · **G** grounded, or honestly unsure.
+
+| | contradicts | ignores | grounded | **ungrounded rate** |
+|---|---|---|---|---|
+| frozen agent | 3 | 11 | 12 | **0.538** |
+| + grounding patch | 2 | 13 | 11 | **0.577** |
+
+Paired over the same 26 cases: the patch **fixed 3, broke 4, changed nothing on
+19**. Delta +0.038, 95% CI [−0.154, +0.231] — no measured effect, and the
+sample is far too small to claim one.
+
+It did work on the headline case:
+
+> **frozen:** "The new Taylor Swift album **is available** on Spotify in the UK."
+> **patched:** "We'd love to have all of Taylor's stuff available, but we have
+> some info about content here: [link]"
+
+But it bought that with evasion elsewhere — contradictions fell 3 to 2 while
+*ignoring a retrieved answer* rose 11 to 13. Told not to fill gaps from its own
+knowledge, a 3B model hedges rather than reading more carefully.
+
+**The number that matters is the baseline, not the delta: 54% of the frozen
+agent's replies are ungrounded.** More than half contradict their retrieval or
+waste an answer sitting in it. It is the worst number in this report and it is
+invisible to intent accuracy.
+
+Prompting is not the fix. Next is structural: a separate retrieval-reading call
+that must quote the span it relies on before any draft is written, making
+grounding a checkable step rather than a hope.
 
 ### What is misleading about my headline number?
 
@@ -355,19 +398,26 @@ is 0.100 and the judge ranks the systems in the wrong order. The same judge
 rates real SpotifyCares agents *below* the bot. Every reply number in this
 report should be read as "what this 7B judge thinks", not "what is good."
 
-**5. One of the four guardrails has never fired.** The router escalates when
+**5. The metrics are blind to the worst failure they could have.** The agent
+told a customer an album was available when all three retrieved cases said it
+was not — and intent accuracy scores that example **correct**, because the
+intent really is `content_request`. The judge is invalid at kappa 0.100. Two
+minutes of demoing found what 147 automated examples missed; assume the same of
+failures nobody has demoed yet.
+
+**6. One of the four guardrails has never fired.** The router escalates when
 self-reported confidence drops below 0.5. Across 147 examples that fired twice,
 both on JSON parse failures another rule already caught. The safety
 architecture is thinner than it looks on paper, and the report's automation
 rate is produced by three rules, not four.
 
-**6. Accuracy is the wrong metric for the actual cost function.** The agent
+**7. Accuracy is the wrong metric for the actual cost function.** The agent
 auto-handled 9 cases a human needed (6.1%) — including a customer reporting a
 compromised account and one whose tweet carried self-harm-adjacent language.
 Meanwhile 19% of the set was escalated unnecessarily. A single accuracy figure
 prices those identically. They are not.
 
-**7. The ground truth is one person's opinion.** 150 labels, one annotator, no
+**8. The ground truth is one person's opinion.** 150 labels, one annotator, no
 inter-annotator agreement number. The taxonomy was derived by clustering, then
 the same person who defined the clusters assigned the labels, and the agent
 retrieves with the same TF-IDF representation the clusters came from. Some part
@@ -375,45 +425,41 @@ of 0.585 is agreement with a clustering artifact. Median labelling time was 12s
 per item over 44 minutes, and 2.0% were marked ambiguous — those numbers are
 published so the ground truth can be judged, not assumed.
 
-An honest one-line summary: **an LLM support agent, evaluated properly, could
-not be shown to beat logistic regression on this brand — and the instrument
-built to judge its replies does not agree with a human.**
+One line: **an LLM support agent, evaluated properly, could not be shown to
+beat logistic regression here; the instrument built to judge its replies does
+not agree with a human; and more than half its replies ignore or contradict the
+evidence it retrieved.**
 
 ### With one more week
 
 Ordered by what would change a conclusion, not by what is most interesting.
 
-1. **Fix the judge, or drop it.** Kappa 0.100 makes every reply metric
-   unusable. First move is a rubric rewritten against the 60 human ratings as a
-   dev set, then re-measure agreement. If a rewritten rubric cannot clear ~0.6,
-   report reply quality by human rating alone and delete the judge.
-2. **A second annotator on 50 examples.** Every caveat in this report bottoms
-   out at "one person decided." Even one more rater converts that from an
-   admission into a measured bound. Failing that, a blind self-retest after 48
-   hours for intra-rater kappa.
-3. **Replace self-reported confidence with a signal that means something.**
-   The current gate is provably dead (failure 2), so there is nothing to tune
-   until it is replaced. Retrieval similarity is the cheapest candidate — it is
-   already computed — followed by agreement between two differently-worded
-   prompts. Once a real signal exists, sweep *its* threshold and plot
-   automation rate against missed escalations, then choose the operating point
-   deliberately instead of inheriting it from a rule. That curve is the thing
-   a support lead actually needs, and this report cannot currently draw it.
-4. **Kill the over-escalation.** 20% of traffic escalated needlessly, because
-   any misclassification into an account-bound intent forces a hand-off.
-   Escalation precision 0.532 means a human's time is wasted roughly as often
-   as it is well spent.
-5. **Add a `null` / no-request class and re-prompt for it.** `other` is 16% of
-   traffic and the agent gets 1 of 24 right. Two-stage classification —
-   "is there a request at all?" then "which kind?" — is the obvious fix.
-6. **Scan the agent's own output for PII requests.** The guardrail checks the
-   customer's message and never the reply. A regex on the draft is an hour's
-   work and closes the highest-real-cost failure in the set.
-7. **Model swap as an ablation.** Run the 7B as the agent against the 3B, same
-   harness, same golden set. If the harness cannot detect a capability
-   difference, the harness is what needs fixing.
-8. **Handle images.** Several tweets carry their payload in a screenshot the
-   pipeline cannot read. Cheapest honest fix is a rule that escalates
+1. **Make grounding structural, not prompted.** The patch failed (54%
+   ungrounded either way). Next: a separate retrieval-reading call that must
+   quote the span it relies on, then a check that the draft asserts nothing
+   outside it. That check needs no LLM judge, which is the point.
+2. **Fix the judge or drop it.** Kappa 0.100 makes every reply metric unusable.
+   Rewrite the rubric against the 60 human ratings as a dev set and re-measure;
+   if it cannot clear ~0.6, report human ratings alone and delete the judge.
+3. **A second annotator on 50 examples.** Every caveat here bottoms out at "one
+   person decided." Failing that, a blind self-retest after 48 hours for
+   intra-rater kappa.
+4. **More labels, for power.** The headline null resolves nothing under ~11
+   accuracy points. 800-1000 labels would make the agent-vs-baseline comparison
+   mean something.
+5. **Replace self-reported confidence.** The gate is provably dead, so there is
+   nothing to tune until it is replaced — retrieval similarity is already
+   computed. Then sweep *its* threshold and plot automation against missed
+   escalations, the curve a support lead actually needs and this report cannot
+   draw.
+6. **Add a `null` / no-request class.** `other` is 16% of traffic at 1 of 24
+   correct. Two-stage — "is there a request?" then "which kind?"
+7. **Scan the agent's own output for PII requests.** The guardrail checks the
+   customer's message, never the reply. An hour's work, closes the
+   highest-real-cost failure in the set.
+8. **Model swap as an ablation, and handle images.** Run the 7B as the agent on
+   the same harness; if it cannot detect the capability difference, the harness
+   needs fixing. Several tweets carry their payload in a screenshot — escalate
    image-only messages rather than guessing.
 
 ---

@@ -35,6 +35,18 @@ Return ONLY a JSON object:
   "escalate": true|false, "reason": "<one short sentence>",
   "reply": "<the draft reply>"}}"""
 
+# Candidate fix for the grounding failure (report failure mode 1), kept OFF by
+# default so the evaluated system stays frozen. Measured by grounding_ablation.py.
+GROUNDING_PATCH = """
+
+CRITICAL — the past cases above are FACTS about what this brand can and cannot
+do, not writing samples. They outrank anything you believe:
+- If they say the brand does NOT have something, the brand does not have it.
+  Never tell the customer it is available.
+- If one of them answers the question, use that answer, including any link.
+- If they do not cover the question, say what you do not know. Do not fill the
+  gap from your own knowledge."""
+
 
 def _exemplars(hits):
     if not hits:
@@ -45,15 +57,17 @@ def _exemplars(hits):
 
 
 class Agent:
-    def __init__(self, retriever: Retriever, k: int = 3, model: str | None = None):
+    def __init__(self, retriever: Retriever, k: int = 3, model: str | None = None,
+                 grounding_patch: bool = False):
         self.r, self.k, self.model = retriever, k, model
+        self.system = SYSTEM + (GROUNDING_PATCH if grounding_patch else "")
 
     def handle(self, message: str) -> dict:
         hits = self.r.search(message, k=self.k)
         user = (f"Similar past cases from this brand's history:\n{_exemplars(hits)}\n\n"
                 f"---\nNew customer message: {message}\n\nJSON:")
         out = chat_json(
-            [{"role": "system", "content": SYSTEM},
+            [{"role": "system", "content": self.system},
              {"role": "user", "content": user}],
             model=self.model, max_tokens=400)
 
