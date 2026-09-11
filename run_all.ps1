@@ -8,4 +8,5 @@ python src/evaluate.py        # golden.jsonl  -> outputs/metrics.json, predictio
 python src/human_ceiling.py   # brand's own replies through the same judge
 python src/significance.py    # bootstrap CIs on agent-vs-simple
 python src/agreement.py       # judge vs human kappa
+python src/grounding_ablation.py --report   # grounding fix ablation (uses committed ratings)
 python src/error_analysis.py  # the failures quoted in the report

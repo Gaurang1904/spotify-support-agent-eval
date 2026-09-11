@@ -14,4 +14,5 @@ PY=$(command -v python || command -v python3 || command -v py) \
 "$PY" src/human_ceiling.py   # brand's own replies through the same judge
 "$PY" src/significance.py    # bootstrap CIs on agent-vs-simple
 "$PY" src/agreement.py       # judge vs human kappa
+"$PY" src/grounding_ablation.py --report   # grounding fix ablation (uses committed ratings)
 "$PY" src/error_analysis.py  # the failures quoted in the report
