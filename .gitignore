@@ -1,0 +1,10 @@
+data/raw/
+# 27MB and derived: src/prep.py regenerates it deterministically in ~1 min
+data/threads.jsonl
+data/*.jsonl.bak
+__pycache__/
+*.pyc
+.env
+.venv/
+outputs/*
+!outputs/llm_cache.db
