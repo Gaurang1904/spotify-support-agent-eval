@@ -405,11 +405,19 @@ intent really is `content_request`. The judge is invalid at kappa 0.100. Two
 minutes of demoing found what 147 automated examples missed; assume the same of
 failures nobody has demoed yet.
 
-**6. One of the four guardrails has never fired.** The router escalates when
-self-reported confidence drops below 0.5. Across 147 examples that fired twice,
-both on JSON parse failures another rule already caught. The safety
-architecture is thinner than it looks on paper, and the report's automation
-rate is produced by three rules, not four.
+**6. Two of the four guardrails have never fired.** The confidence gate
+(escalate below 0.5) fired twice in 147, both on JSON parse failures another
+rule already caught. The "no similar resolved case" gate fired **zero** times,
+because `Retriever.search` returns any hit with similarity above 0 and the gate
+only tests whether the list is empty — so a top hit at 0.33 counts as
+grounding. On the golden set 25% of cases have a top similarity at or below
+0.35 and 65% at or below 0.50, and the gate passed all of them. Live example:
+*"do you sell headphones"* retrieved three irrelevant cases (0.41 / 0.33 /
+0.33) and the agent invented a Spotify store — *"we do have a wide selection of
+audio equipment and accessories available for purchase on our website"*. The
+safety architecture is half the size it appears, and the automation rate comes
+from two rules, not four. Both dead gates want the same fix: a similarity
+floor, which is next-week item 5.
 
 **7. Accuracy is the wrong metric for the actual cost function.** The agent
 auto-handled 9 cases a human needed (6.1%) — including a customer reporting a
