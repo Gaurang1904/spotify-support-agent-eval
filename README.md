@@ -291,10 +291,9 @@ a calibrated one. Gating on self-reported confidence rests on nothing; the fix
 is an external signal — retrieval similarity, classifier margin, or two-prompt
 agreement.
 
-**3. `other` is undetectable — 24 gold examples, 1 correct.**
-The model has no concept of "this tweet contains no classifiable request." The
-24 `other` rows scatter into `account_access` (8), `praise_chatter` (6),
-`feature_feedback` (3), `content_request` (3), `billing_subscription` (3).
+**3. `other` is undetectable — 24 gold examples, 1 correct.** The model has no
+concept of "this tweet contains no classifiable request". The 24 rows scatter
+into `account_access` (8), `praise_chatter` (6) and four other classes.
 
 > "Answer my DM! Urgent, thanks." -> predicted `praise_chatter`, confidence 1.0
 
@@ -455,11 +454,11 @@ Ordered by what would change a conclusion, not by what is most interesting.
 4. **More labels, for power.** The headline null resolves nothing under ~11
    accuracy points. 800-1000 labels would make the agent-vs-baseline comparison
    mean something.
-5. **Replace self-reported confidence.** The gate is provably dead, so there is
-   nothing to tune until it is replaced — retrieval similarity is already
-   computed. Then sweep *its* threshold and plot automation against missed
-   escalations, the curve a support lead actually needs and this report cannot
-   draw.
+5. **Add a retrieval-similarity floor.** It repairs both dead gates at once:
+   it is the honest replacement for self-reported confidence and the missing
+   test in the "no similar case" check. Then sweep its threshold and plot
+   automation against missed escalations — the curve a support lead needs and
+   this report cannot draw.
 6. **Add a `null` / no-request class.** `other` is 16% of traffic at 1 of 24
    correct. Two-stage — "is there a request?" then "which kind?"
 7. **Scan the agent's own output for PII requests.** The guardrail checks the
